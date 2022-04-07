@@ -16,29 +16,12 @@
 #define MEDIUM_BOMB 40
 #define TOUGH_BOMB 99
 
-/* ============Current Status============= */
-/*  | 1 2 3 4 5 6 7 8 9 |1
-----------------------2
-1| X 2               |3
-2| X 2               |4
-3| X 2               |5
-4| X 2               |6
-5| X 2               |7
-6| X 2               |8
-7| X 2               |9
-8| X 2               |1
-9| X 2               |2
-----------------------3
-1234567891234567891234 */
-
 using namespace std;
 
 class grid{
 public:
 	bool is_opened=false;
 	char data='-';
-	int row=-1;
-	int col=-1;
 };
 
 // FOREGROUND_RED|BACKGROUND_BLUE| ......
@@ -50,17 +33,14 @@ void change_font_color(WORD c)
 
 // show table
 void color_grid(string stats, char c){
-    if(stats=="number"){  // green output
-        change_font_color(FOREGROUND_GREEN);
-        cout<<c;
-        change_font_color(7);
-    }
-	else if(stats=="bomb"){
+	if(stats=="bomb"){
 		change_font_color(FOREGROUND_RED);
         cout<<c;
         change_font_color(7);
 	}else if(stats=="safe"){
-		change_font_color(FOREGROUND_RED|FOREGROUND_GREEN);
+		if(c=='0')change_font_color(FOREGROUND_BLUE|FOREGROUND_RED);
+		else if(c=='1')change_font_color(FOREGROUND_RED|FOREGROUND_INTENSITY);
+		else change_font_color(FOREGROUND_GREEN|FOREGROUND_RED);
         cout<<c;
         change_font_color(7);
 	}
@@ -82,7 +62,12 @@ void show_message(string stats, string line, bool new_line){
         change_font_color(FOREGROUND_RED|FOREGROUND_GREEN);
         cout<<line;
         change_font_color(7);
-    }                   
+    }    
+	else if(stats=="number"){  // green output
+        change_font_color(FOREGROUND_GREEN);
+        cout<<line;
+        change_font_color(7);
+    }
     else if(stats=="normal"){// normal white color
 		cout<<line;
 	}
@@ -171,6 +156,40 @@ void generate_bomb(string game_mode, int max_size, vector<vector<grid>>& table){
 		}
 		else;
 	}
+	// update all data
+	for(int i=0;i<table.size();i++){
+		for(int j=0;j<table.size();j++){
+			if(table[i][j].data!='X'){
+				int count=0;
+				if(i-1>=0&&j-1>=0){
+					if(table[i-1][j-1].data=='X')count++;
+				}
+				if(i-1>=0&&j>=0){
+					if(table[i-1][j].data=='X')count++;
+				}
+				if(i-1>=0&&j+1<table.size()){
+					if(table[i-1][j+1].data=='X')count++;
+				}
+				if(i>=0&&j-1>=0){
+					if(table[i][j-1].data=='X')count++;
+				}
+				if(i>=0&&j+1<table.size()){
+					if(table[i][j+1].data=='X')count++;
+				}
+				if(i+1<table.size()&&j-1>=0){
+					if(table[i+1][j-1].data=='X')count++;
+				}
+				if(i+1<table.size()&&j>=0){
+					if(table[i+1][j].data=='X')count++;
+				}
+				if(i+1<table.size()&&j+1<table.size()){
+					if(table[i+1][j+1].data=='X')count++;
+				}
+				table[i][j].data=char(count+'0');
+			}
+			else;
+		}
+	}
 	return;
 }
 
@@ -198,27 +217,106 @@ vector<vector<grid>> build_game(string game_mode){
 	}
 }
 
-// print out table
-void print_table(vector<vector<grid>> table){
-	
-	show_message("info", "============Current Status=============\n", true);
+// check already win or not
+bool is_win(vector<vector<grid>> table){
 	for(int i=0;i<table.size();i++){
 		for(int j=0;j<table.size();j++){
-			color_grid("safe", table[i][j].data);
+			if(table[i][j].data!='X'&&table[i][j].is_opened==false)return false;
+		}
+	}
+	return true;
+}
+
+// print out table
+void print_table(vector<vector<grid>> table, string current_status){
+	show_message("info", "> Current Status: "+current_status, true);
+	// print col number
+	cout<<"   ";
+	for(int i=1;i<=table.size();i++){		
+		if(i<10)show_message("number", "0"+to_string(i), false);
+		else show_message("number", to_string(i), false);
+		cout<<" ";
+	}
+	cout<<endl;
+	cout<<"   ";
+	for(int i=1;i<=table.size();i++){		
+		show_message("number", "___", false);
+	}
+	cout<<endl;
+	for(int i=0;i<table.size();i++){
+		if(i<9)show_message("number", "0"+to_string(i+1)+"|", false);
+		else show_message("number", to_string(i+1)+"|", false);
+		cout<<" ";
+		for(int j=0;j<table.size();j++){
+			if(!table[i][j].is_opened)color_grid("notopen", '-');
+			else if(table[i][j].data=='X')color_grid("bomb", table[i][j].data);
+			else color_grid("safe", table[i][j].data);
+			cout<<"  ";
 		}
 		cout<<endl;
 	}
-	show_message("info", "=======================================", true);
+	show_message("number", "===", false);
+	for(int i=0;i<table.size();i++){
+		show_message("number", "===", false);
+	}
+	cout<<endl;
+	return;
 }
 
-
+// show all non-bomb grids
+void non_bomb_grid(vector<vector<grid>>& table, int row, int col){
+	
+}
 
 void minesweeper(){
 	game_info(); 
 	string game_mode=get_user_input("\nChoose mode[1/2/3]: ", true, 1, 3);
+	int max_size=0;
+	if(game_mode=="1")max_size=EASY_MAX;
+	else if(game_mode=="2")max_size=MEDIUM_MAX;
+	else max_size=TOUGH_MAX;
 	system("cls");
 	vector<vector<grid>> table=build_game(game_mode);
-	print_table(table);
+	string current_status="keep going\n";
+	bool not_end=true;
+	// game start
+	while(not_end){
+		system("cls");
+		print_table(table, current_status);
+		bool valid_input=false;
+		int row=0, col=0;
+		while(!valid_input){
+			row=stoi(get_user_input("Row number: ", true, 1, max_size))-1;
+			col=stoi(get_user_input("Col number: ", true, 1, max_size))-1;
+			if(table[row][col].is_opened)show_message("normal", "failed: Already opened this grid", true);
+			else{
+				table[row][col].is_opened=true; // update already open
+				valid_input=true;
+			}
+		}
+		// all possible condition
+		if(table[row][col].data=='X'){ // boom 
+			current_status="Boom! You lose !!\n";
+			for(int i=0;i<table.size();i++){ // detonate all bombs
+				for(int j=0;j<table.size();j++){
+					if(table[i][j].data=='X')table[i][j].is_opened=true;
+				}
+			}
+			system("cls");
+			print_table(table, current_status);
+			not_end=false;
+		}
+		else if(is_win(table)){   // win the game
+			system("cls");
+			current_status="Congrats! You win !!\n";
+			print_table(table, current_status);
+			not_end=false;
+		}
+		else{
+			non_bomb_grid(table, row, col); 	// show all nearby non-bomb grids
+			not_end=true;
+		} 
+	}
 	return;
 }
 
@@ -227,7 +325,7 @@ int main(){
 	bool again=true;
 	while(again){
 		minesweeper();
-		again=yes_or_not("Do you want to continue?? [y/n] ");
+		again=yes_or_not("> Do you want to continue?? [y/n] ");
 		system("cls");
 	}
 	return 0;
